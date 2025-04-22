@@ -229,7 +229,6 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("FIPS-186 Generator")
         self.geometry("800x600")
 
         # Создание и размещение элементов интерфейса
