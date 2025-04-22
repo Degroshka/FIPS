@@ -4,20 +4,29 @@ import hashlib
 import random
 
 class FIPS186Generator:
-    def __init__(self, b):
+    def __init__(self, b, t=None):
         """
         Инициализация генератора FIPS-186
         b: размер в битах (160 ≤ b ≤ 512)
+        t: вспомогательное слово (в шестнадцатеричном формате)
         """
         if not 160 <= b <= 512:
             raise ValueError("b должно быть от 160 до 512")
-        self.b = b  
+        self.b = b
         # Шаг 1: Задать произвольное число b: 160 ≤ b ≤ 512
         self.q = (1 << b) - 1
         # Шаг 2: Сгенерировать случайное b-битное начальное значение z
         self.z = random.getrandbits(b)
         # Шаг 3: Задать вспомогательное 160-битное слово t
-        self.t = bytes.fromhex("67452301efcdab8998badcfe10325476c3d2e1f0")
+        if t is None:
+            t = "67452301efcdab8998badcfe10325476c3d2e1f0"
+        # Проверяем, что t является корректным 160-битным словом (40 символов в hex)
+        if len(t.replace(" ", "")) != 40:
+            raise ValueError("t должно быть 160-битным словом (40 символов в hex)")
+        try:
+            self.t = bytes.fromhex(t.replace(" ", ""))
+        except ValueError:
+            raise ValueError("Некорректный формат шестнадцатеричного числа")
 
     def G(self, c):
         """
@@ -219,74 +228,77 @@ def cumulative_sums_test_extended(bits):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("FIPS-186 Генератор")
-        self.geometry("1000x850")
 
-        self.b_label = tk.Label(self, text="Длина b (160-512):")
-        self.b_label.pack()
+        self.title("FIPS-186 Generator")
+        self.geometry("800x600")
+
+        # Создание и размещение элементов интерфейса
+        tk.Label(self, text="Размер b (160-512):").pack(pady=5)
         self.b_entry = tk.Entry(self)
+        self.b_entry.pack(pady=5)
         self.b_entry.insert(0, "160")
-        self.b_entry.pack()
 
-        self.count_label = tk.Label(self, text="Количество бит:")
-        self.count_label.pack()
+        tk.Label(self, text="Вспомогательное слово t (hex):").pack(pady=5)
+        self.t_entry = tk.Entry(self, width=50)
+        self.t_entry.pack(pady=5)
+        self.t_entry.insert(0, "67452301 efcdab89 98badcfe 10325476 c3d2e1f0")
+
+        tk.Label(self, text="Количество генерируемых бит:").pack(pady=5)
         self.count_entry = tk.Entry(self)
+        self.count_entry.pack(pady=5)
         self.count_entry.insert(0, "1000")
-        self.count_entry.pack()
 
-        tk.Button(self, text="Сгенерировать", command=self.generate).pack(pady=10)
-        tk.Button(self, text="Сохранить в файл", command=self.save_to_file).pack()
-        tk.Button(self, text="Выполнить тесты", command=self.run_tests).pack(pady=10)
+        # Кнопки
+        tk.Button(self, text="Генерировать", command=self.generate).pack(pady=10)
+        tk.Button(self, text="Запустить тесты", command=self.run_tests).pack(pady=5)
+        tk.Button(self, text="Сохранить в файл", command=self.save_to_file).pack(pady=5)
 
-        self.output_text = tk.Text(self, height=20, wrap=tk.WORD)
-        self.output_text.pack(pady=5)
-
-        self.test_text = tk.Text(self, height=20, wrap=tk.WORD, bg="#eef")
-        self.test_text.pack(pady=5)
-
-        self.generated_bits = ""
+        # Текстовое поле для вывода результатов
+        self.result_text = tk.Text(self, height=20, width=80)
+        self.result_text.pack(pady=10)
 
     def generate(self):
         try:
             b = int(self.b_entry.get())
-            if not (160 <= b <= 512):
-                raise ValueError("b должно быть от 160 до 512.")
-            
-            requested_bits = int(self.count_entry.get())
-            gen = FIPS186Generator(b)
-            
-            # Генерируем битовую последовательность
-            self.generated_bits = gen.generate_sequence(requested_bits)
+            count = int(self.count_entry.get())
+            t = self.t_entry.get()
 
-            # Очищаем поле вывода
-            self.output_text.delete("1.0", tk.END)
+            # Создание генератора
+            generator = FIPS186Generator(b, t)
             
-            # Выводим биты группами по 64 для удобства чтения
-            for i in range(0, len(self.generated_bits), 64):
-                self.output_text.insert(tk.END, self.generated_bits[i:i+64] + "\n")
-
-            self.test_text.delete("1.0", tk.END)
+            # Генерация последовательности
+            sequence = generator.generate_sequence(count)
             
-        except Exception as e:
+            # Вывод результатов
+            self.result_text.delete(1.0, tk.END)
+            self.result_text.insert(tk.END, f"Сгенерированная последовательность ({len(sequence)} бит):\n")
+            self.result_text.insert(tk.END, sequence)
+            
+            # Сохраняем последовательность для тестов
+            self.last_sequence = sequence
+            
+        except ValueError as e:
             messagebox.showerror("Ошибка", str(e))
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Произошла ошибка: {str(e)}")
 
     def run_tests(self):
-        if not self.generated_bits:
+        if not self.last_sequence:
             messagebox.showerror("Ошибка", "Сначала сгенерируйте последовательность.")
             return
-        self.test_text.delete("1.0", tk.END)
-        self.test_text.insert(tk.END, frequency_test(self.generated_bits) + "\n\n")
-        self.test_text.insert(tk.END, runs_test(self.generated_bits) + "\n\n")
-        self.test_text.insert(tk.END, cumulative_sums_test_extended(self.generated_bits))
+        self.result_text.delete("1.0", tk.END)
+        self.result_text.insert(tk.END, frequency_test(self.last_sequence) + "\n\n")
+        self.result_text.insert(tk.END, runs_test(self.last_sequence) + "\n\n")
+        self.result_text.insert(tk.END, cumulative_sums_test_extended(self.last_sequence))
 
     def save_to_file(self):
-        if not self.generated_bits:
+        if not self.last_sequence:
             messagebox.showerror("Ошибка", "Нет данных для сохранения.")
             return
         path = filedialog.asksaveasfilename(defaultextension=".txt")
         if path:
             with open(path, "w") as f:
-                f.write(self.generated_bits)
+                f.write(self.last_sequence)
 
 if __name__ == "__main__":
     app = App()
