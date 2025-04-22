@@ -5,11 +5,6 @@ import random
 
 class FIPS186Generator:
     def __init__(self, b, t=None):
-        """
-        Инициализация генератора FIPS-186
-        b: размер в битах (160 ≤ b ≤ 512)
-        t: вспомогательное слово (в шестнадцатеричном формате)
-        """
         if not 160 <= b <= 512:
             raise ValueError("b должно быть от 160 до 512")
         self.b = b
@@ -29,14 +24,6 @@ class FIPS186Generator:
             raise ValueError("Некорректный формат шестнадцатеричного числа")
 
     def G(self, c):
-        """
-        Алгоритм вычисления значений функции G(t,c):
-        1. Разбить слово t на пять 32-битных слов
-        2. К слову c дописать справа 512-b нулей
-        3. Разбить слово M на шестнадцать 32-битных слов
-        4. Выполнить 1 раз шаг 4 алгоритма SHA-1
-        5. Выходное слово является конкатенацией H0||H1||H2||H3||H4
-        """
         # Шаг 1: Разбиваем t на пять 32-битных слов
         H0 = 0x67452301
         H1 = 0xEFCDAB89
@@ -66,7 +53,6 @@ class FIPS186Generator:
             B = A
             A = temp & 0xFFFFFFFF
 
-        # Шаг 5: Формируем выходное значение как конкатенацию
         H0 = (H0 + A) & 0xFFFFFFFF
         H1 = (H1 + B) & 0xFFFFFFFF
         H2 = (H2 + C) & 0xFFFFFFFF
@@ -80,7 +66,6 @@ class FIPS186Generator:
     def generate_sequence(self, count):
         """
         Генерация последовательности псевдослучайных чисел
-        count: количество генерируемых бит
         """
         result_bits = ""
         x = 0
@@ -282,22 +267,32 @@ class App(tk.Tk):
             messagebox.showerror("Ошибка", f"Произошла ошибка: {str(e)}")
 
     def run_tests(self):
-        if not self.last_sequence:
-            messagebox.showerror("Ошибка", "Сначала сгенерируйте последовательность.")
-            return
-        self.result_text.delete("1.0", tk.END)
-        self.result_text.insert(tk.END, frequency_test(self.last_sequence) + "\n\n")
-        self.result_text.insert(tk.END, runs_test(self.last_sequence) + "\n\n")
-        self.result_text.insert(tk.END, cumulative_sums_test_extended(self.last_sequence))
+        try:
+            if not hasattr(self, 'last_sequence') or not self.last_sequence:
+                messagebox.showerror("Ошибка", "Сначала сгенерируйте последовательность!")
+                return
+            
+            self.result_text.delete("1.0", tk.END)
+            self.result_text.insert(tk.END, "Результаты тестов:\n\n")
+            self.result_text.insert(tk.END, frequency_test(self.last_sequence) + "\n\n")
+            self.result_text.insert(tk.END, runs_test(self.last_sequence) + "\n\n")
+            self.result_text.insert(tk.END, cumulative_sums_test_extended(self.last_sequence))
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при выполнении тестов: {str(e)}")
 
     def save_to_file(self):
-        if not self.last_sequence:
-            messagebox.showerror("Ошибка", "Нет данных для сохранения.")
-            return
-        path = filedialog.asksaveasfilename(defaultextension=".txt")
-        if path:
-            with open(path, "w") as f:
-                f.write(self.last_sequence)
+        try:
+            if not hasattr(self, 'last_sequence') or not self.last_sequence:
+                messagebox.showerror("Ошибка", "Нет данных для сохранения! Сначала сгенерируйте последовательность.")
+                return
+            
+            path = filedialog.asksaveasfilename(defaultextension=".txt")
+            if path:
+                with open(path, "w") as f:
+                    f.write(self.last_sequence)
+                messagebox.showinfo("Успех", "Последовательность успешно сохранена в файл.")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при сохранении файла: {str(e)}")
 
 if __name__ == "__main__":
     app = App()
